@@ -1,42 +1,165 @@
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+.board {
+  display: grid;
+  width: 100vw;
+  height: 100dvh;
+  gap: 5px;
+  padding: 5px;
+  background: #111;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+/* ---- Tile ---- */
+.tile {
+  position: relative;
+  background: #e8e8e8;
+  border-radius: 5px;
+  overflow: visible;
+  cursor: grab;
+  container-type: size;
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
+.tile:active {
+  cursor: grabbing;
+}
+
+/* ---- Half display (static background) ---- */
+.half {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: calc(50% - 1.5px);
+  overflow: hidden;
+}
+
+.upper {
+  top: 0;
+  background: linear-gradient(to bottom, #fff 0%, #fafafa 70%, #f3f3f3 100%);
+  border-radius: 5px 5px 0 0;
+}
+
+.lower {
+  bottom: 0;
+  background: linear-gradient(to bottom, #ebebeb 0%, #f2f2f2 30%, #fafafa 100%);
+  border-radius: 0 0 5px 5px;
+}
+
+/* Text wrapper: 200% of the half = 100% of tile */
+.half-text {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 200%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.upper .half-text {
+  top: 0;
+}
+
+.lower .half-text {
+  bottom: 0;
+}
+
+.half-text span {
+  font-family: 'Alternate Gothic', 'Helvetica Neue', 'Arial', sans-serif;
+  font-weight: normal;
+  font-size: min(120cqi, 130cqb);
+  text-transform: uppercase;
+  color: #111;
+  line-height: 1;
+  font-feature-settings: 'tnum';
+}
+
+
+/* ---- Split: metallic axle rod ---- */
+.split-line {
+  position: absolute;
+  left: -1px;
+  right: -1px;
+  top: 50%;
+  height: 3px;
+  transform: translateY(-50%);
+  z-index: 20;
+  pointer-events: none;
+  background: #111;
+  border-radius: 1px;
+}
+
+/* ---- Axle pins: side-view of cylinder = rectangle ---- */
+.pin {
+  position: absolute;
+  top: 50%;
+  width: 8px;
+  height: 4px;
+  border-radius: 1px;
+  transform: translateY(-50%);
+  z-index: 30;
+  pointer-events: none;
+  background: #111;
+}
+
+.pin-l {
+  left: -6px;
+}
+
+.pin-r {
+  right: -6px;
+}
+
+/* ---- Animated flaps ---- */
+.flap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: calc(50% - 1.5px);
+  overflow: hidden;
+  z-index: 10;
+}
+
+.flap-top {
+  top: 0;
+  background: linear-gradient(to bottom, #fff 0%, #fafafa 70%, #f3f3f3 100%);
+  border-radius: 5px 5px 0 0;
+  transform-origin: bottom center;
+  animation: flapDown 0.25s ease-in forwards;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
+}
+
+.flap-top .half-text {
+  top: 0;
+}
+
+.flap-bottom {
+  bottom: 0;
+  background: linear-gradient(to bottom, #ebebeb 0%, #f2f2f2 30%, #fafafa 100%);
+  border-radius: 0 0 5px 5px;
+  transform-origin: top center;
+  animation: flapUp 0.25s ease-out 0.12s both;
+  box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.flap-bottom .half-text {
+  bottom: 0;
+}
+
+@keyframes flapDown {
+  0% {
+    transform: perspective(600px) rotateX(0deg);
   }
-  to {
-    transform: rotate(360deg);
+  100% {
+    transform: perspective(600px) rotateX(-90deg);
   }
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
+@keyframes flapUp {
+  0% {
+    transform: perspective(600px) rotateX(90deg);
   }
-}
-
-.card {
-  padding: 2em;
-}
-
-.read-the-docs {
-  color: #888;
+  100% {
+    transform: perspective(600px) rotateX(0deg);
+  }
 }
