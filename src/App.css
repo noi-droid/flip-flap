@@ -75,6 +75,31 @@
 }
 
 
+/* ---- Inverted (tap toggle) ---- */
+.tile.inverted {
+  background: #111;
+}
+
+.tile.inverted .upper {
+  background: linear-gradient(to bottom, #222 0%, #1d1d1d 70%, #181818 100%);
+}
+
+.tile.inverted .lower {
+  background: linear-gradient(to bottom, #151515 0%, #191919 30%, #1e1e1e 100%);
+}
+
+.tile.inverted .half-text span {
+  color: #f0f0f0;
+}
+
+.tile.inverted .flap-top {
+  background: linear-gradient(to bottom, #222 0%, #1d1d1d 70%, #181818 100%);
+}
+
+.tile.inverted .flap-bottom {
+  background: linear-gradient(to bottom, #151515 0%, #191919 30%, #1e1e1e 100%);
+}
+
 /* ---- Split: metallic axle rod ---- */
 .split-line {
   position: absolute;

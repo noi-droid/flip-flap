@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import './App.css'
 
-const CHARS = ' ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'.split('')
+const CHARS = '!ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'.split('')
 const ANIM_MS = 300
 const CHAIN_MS = 100
 
@@ -11,6 +11,7 @@ function Tile() {
   const [flipping, setFlipping] = useState(false)
   const [flipId, setFlipId] = useState(0)
   const [fast, setFast] = useState(false)
+  const [inverted, setInverted] = useState(false)
 
   const idxRef = useRef(index)
   const lockRef = useRef(false)
@@ -80,7 +81,10 @@ function Tile() {
     if (!ptrRef.current.active) return
     ptrRef.current.active = false
     const dy = ptrRef.current.startY - e.clientY
-    if (Math.abs(dy) <= 10) return
+    if (Math.abs(dy) <= 10) {
+      setInverted((v) => !v)
+      return
+    }
 
     const elapsed = Math.max(1, Date.now() - ptrRef.current.startTime)
     const velocity = Math.abs(dy) / elapsed // px/ms
@@ -109,7 +113,7 @@ function Tile() {
 
   return (
     <div
-      className="tile"
+      className={`tile${inverted ? ' inverted' : ''}`}
       ref={tileRef}
       onPointerDown={onDown}
       onPointerMove={onMove}
