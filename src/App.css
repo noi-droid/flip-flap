@@ -10,10 +10,10 @@
   -webkit-user-select: none;
 }
 
-/* ---- Tile ---- */
+/* ---- Tile (default: dark) ---- */
 .tile {
   position: relative;
-  background: #e8e8e8;
+  background: #111;
   border-radius: 5px;
   overflow: visible;
   cursor: grab;
@@ -35,13 +35,13 @@
 
 .upper {
   top: 0;
-  background: linear-gradient(to bottom, #fff 0%, #fafafa 70%, #f3f3f3 100%);
+  background: #1a1a1a;
   border-radius: 5px 5px 0 0;
 }
 
 .lower {
   bottom: 0;
-  background: linear-gradient(to bottom, #ebebeb 0%, #f2f2f2 30%, #fafafa 100%);
+  background: #1a1a1a;
   border-radius: 0 0 5px 5px;
 }
 
@@ -69,38 +69,37 @@
   font-weight: normal;
   font-size: min(120cqi, 130cqb);
   text-transform: uppercase;
-  color: #111;
+  color: #f0f0f0;
   line-height: 1;
   font-feature-settings: 'tnum';
 }
 
-
-/* ---- Inverted (tap toggle) ---- */
+/* ---- Inverted (tap toggle → white) ---- */
 .tile.inverted {
-  background: #111;
+  background: #e8e8e8;
 }
 
 .tile.inverted .upper {
-  background: linear-gradient(to bottom, #222 0%, #1d1d1d 70%, #181818 100%);
+  background: linear-gradient(to bottom, #fff 0%, #fafafa 70%, #f3f3f3 100%);
 }
 
 .tile.inverted .lower {
-  background: linear-gradient(to bottom, #151515 0%, #191919 30%, #1e1e1e 100%);
+  background: linear-gradient(to bottom, #ebebeb 0%, #f2f2f2 30%, #fafafa 100%);
 }
 
 .tile.inverted .half-text span {
-  color: #f0f0f0;
+  color: #111;
 }
 
 .tile.inverted .flap-top {
-  background: linear-gradient(to bottom, #222 0%, #1d1d1d 70%, #181818 100%);
+  background: linear-gradient(to bottom, #fff 0%, #fafafa 70%, #f3f3f3 100%);
 }
 
 .tile.inverted .flap-bottom {
-  background: linear-gradient(to bottom, #151515 0%, #191919 30%, #1e1e1e 100%);
+  background: linear-gradient(to bottom, #ebebeb 0%, #f2f2f2 30%, #fafafa 100%);
 }
 
-/* ---- Split: metallic axle rod ---- */
+/* ---- Split: axle rod ---- */
 .split-line {
   position: absolute;
   left: -1px;
@@ -147,11 +146,10 @@
 
 .flap-top {
   top: 0;
-  background: linear-gradient(to bottom, #fff 0%, #fafafa 70%, #f3f3f3 100%);
+  background: #1a1a1a;
   border-radius: 5px 5px 0 0;
   transform-origin: bottom center;
   animation: flapDown 0.25s ease-in forwards;
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
 }
 
 .flap-top .half-text {
@@ -160,11 +158,10 @@
 
 .flap-bottom {
   bottom: 0;
-  background: linear-gradient(to bottom, #ebebeb 0%, #f2f2f2 30%, #fafafa 100%);
+  background: #1a1a1a;
   border-radius: 0 0 5px 5px;
   transform-origin: top center;
   animation: flapUp 0.25s ease-out 0.12s both;
-  box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.1);
 }
 
 .flap-bottom .half-text {
