@@ -146,6 +146,16 @@
   bottom: 0;
 }
 
+/* ---- Fast chain flips ---- */
+.flap-top.fast {
+  animation-duration: 0.08s;
+}
+
+.flap-bottom.fast {
+  animation-duration: 0.08s;
+  animation-delay: 0.03s;
+}
+
 @keyframes flapDown {
   0% {
     transform: perspective(600px) rotateX(0deg);

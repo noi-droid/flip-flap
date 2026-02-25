@@ -2,18 +2,22 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import './App.css'
 
 const CHARS = ' ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'.split('')
-const ANIM_MS = 320
+const ANIM_MS = 300
+const CHAIN_MS = 100
 
 function Tile() {
   const [index, setIndex] = useState(() => Math.floor(Math.random() * CHARS.length))
   const [prev, setPrev] = useState(index)
   const [flipping, setFlipping] = useState(false)
   const [flipId, setFlipId] = useState(0)
+  const [fast, setFast] = useState(false)
 
   const idxRef = useRef(index)
   const lockRef = useRef(false)
   const tileRef = useRef(null)
-  const ptrRef = useRef({ active: false, startY: 0 })
+  const ptrRef = useRef({ active: false, startY: 0, startTime: 0 })
+  const queueRef = useRef(0)
+  const dirRef = useRef(0)
 
   const wrap = (i) => ((i % CHARS.length) + CHARS.length) % CHARS.length
 
@@ -23,23 +27,41 @@ function Tile() {
 
     const cur = idxRef.current
     const next = wrap(cur + dir)
+    const willChain = queueRef.current > 0
+
     setPrev(cur)
     idxRef.current = next
     setIndex(next)
     setFlipId((id) => id + 1)
+    setFast(willChain)
     setFlipping(true)
 
+    const ms = willChain ? CHAIN_MS : ANIM_MS
     setTimeout(() => {
       setFlipping(false)
       lockRef.current = false
-    }, ANIM_MS)
+      if (queueRef.current > 0) {
+        queueRef.current--
+        requestAnimationFrame(() => doFlip(dirRef.current))
+      }
+    }, ms)
   }, [])
+
+  const flick = useCallback((dir, count) => {
+    dirRef.current = dir
+    if (lockRef.current) {
+      queueRef.current = count
+    } else {
+      queueRef.current = Math.max(0, count - 1)
+      doFlip(dir)
+    }
+  }, [doFlip])
 
   // --- Pointer events ---
   const onDown = (e) => {
     if (lockRef.current) return
     tileRef.current?.setPointerCapture(e.pointerId)
-    ptrRef.current = { active: true, startY: e.clientY }
+    ptrRef.current = { active: true, startY: e.clientY, startTime: Date.now() }
   }
 
   const onMove = (e) => {
@@ -49,6 +71,7 @@ function Tile() {
 
     if (!lockRef.current && Math.abs(dy) > h * 0.25) {
       ptrRef.current.startY = e.clientY
+      ptrRef.current.startTime = Date.now()
       doFlip(dy > 0 ? 1 : -1)
     }
   }
@@ -57,9 +80,13 @@ function Tile() {
     if (!ptrRef.current.active) return
     ptrRef.current.active = false
     const dy = ptrRef.current.startY - e.clientY
-    if (!lockRef.current && Math.abs(dy) > 10) {
-      doFlip(dy > 0 ? 1 : -1)
-    }
+    if (Math.abs(dy) <= 10) return
+
+    const elapsed = Math.max(1, Date.now() - ptrRef.current.startTime)
+    const velocity = Math.abs(dy) / elapsed // px/ms
+    const count = Math.min(15, Math.max(1, Math.round(velocity * 6)))
+
+    flick(dy > 0 ? 1 : -1, count)
   }
 
   // --- Wheel ---
@@ -68,22 +95,16 @@ function Tile() {
     if (!el) return
     const onWheel = (e) => {
       e.preventDefault()
-      doFlip(e.deltaY > 0 ? 1 : -1)
+      const dir = e.deltaY > 0 ? 1 : -1
+      const count = Math.min(10, Math.max(1, Math.round(Math.abs(e.deltaY) / 40)))
+      flick(dir, count)
     }
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => el.removeEventListener('wheel', onWheel)
-  }, [doFlip])
+  }, [flick])
 
   const curChar = CHARS[index]
   const prevChar = CHARS[prev]
-
-  /*
-   * Split-flap animation logic:
-   *   Static upper  → always shows NEW char (hidden behind flap-top initially)
-   *   Static lower  → shows OLD char during flip, NEW char after
-   *   flap-top      → OLD char top half, folds downward to reveal static upper
-   *   flap-bottom   → NEW char bottom half, unfolds to cover static lower
-   */
   const lowerChar = flipping ? prevChar : curChar
 
   return (
@@ -95,32 +116,20 @@ function Tile() {
       onPointerUp={onUp}
       onPointerCancel={onUp}
     >
-      {/* Static upper: NEW char top half */}
       <div className="half upper">
-        <div className="half-text">
-          <span>{curChar}</span>
-        </div>
+        <div className="half-text"><span>{curChar}</span></div>
       </div>
-
-      {/* Static lower: OLD char during flip, NEW char after */}
       <div className="half lower">
-        <div className="half-text">
-          <span>{lowerChar}</span>
-        </div>
+        <div className="half-text"><span>{lowerChar}</span></div>
       </div>
 
-      {/* Animated flaps */}
       {flipping && (
         <>
-          <div className="flap flap-top" key={`t${flipId}`}>
-            <div className="half-text">
-              <span>{prevChar}</span>
-            </div>
+          <div className={`flap flap-top${fast ? ' fast' : ''}`} key={`t${flipId}`}>
+            <div className="half-text"><span>{prevChar}</span></div>
           </div>
-          <div className="flap flap-bottom" key={`b${flipId}`}>
-            <div className="half-text">
-              <span>{curChar}</span>
-            </div>
+          <div className={`flap flap-bottom${fast ? ' fast' : ''}`} key={`b${flipId}`}>
+            <div className="half-text"><span>{curChar}</span></div>
           </div>
         </>
       )}
