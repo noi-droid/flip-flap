@@ -93,6 +93,14 @@ function Tile() {
     flick(dy > 0 ? 1 : -1, count)
   }
 
+  // --- Initial random flips on mount ---
+  useEffect(() => {
+    const delay = Math.random() * 1200
+    const count = 3 + Math.floor(Math.random() * 8)
+    const timer = setTimeout(() => flick(1, count), delay)
+    return () => clearTimeout(timer)
+  }, [flick])
+
   // --- Wheel ---
   useEffect(() => {
     const el = tileRef.current
