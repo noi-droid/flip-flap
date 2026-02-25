@@ -1,11 +1,11 @@
-import { useState, useRef, useCallback, useEffect } from 'react'
+import { useState, useRef, useCallback, useEffect, forwardRef, useImperativeHandle } from 'react'
 import './App.css'
 
 const CHARS = ' !ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'.split('')
 const ANIM_MS = 300
 const CHAIN_MS = 100
 
-function Tile() {
+const Tile = forwardRef(function Tile({ disabled = false }, ref) {
   const [index, setIndex] = useState(() => Math.floor(Math.random() * CHARS.length))
   const [prev, setPrev] = useState(index)
   const [flipping, setFlipping] = useState(false)
@@ -58,15 +58,27 @@ function Tile() {
     }
   }, [doFlip])
 
+  useImperativeHandle(ref, () => ({
+    flipTo(char) {
+      const targetChar = char.toUpperCase()
+      const targetIdx = CHARS.indexOf(targetChar)
+      const target = targetIdx === -1 ? 0 : targetIdx
+      const current = idxRef.current
+      if (current === target) return
+      const distance = (target - current + CHARS.length) % CHARS.length
+      flick(1, distance)
+    }
+  }), [flick])
+
   // --- Pointer events ---
   const onDown = (e) => {
-    if (lockRef.current) return
+    if (disabled || lockRef.current) return
     tileRef.current?.setPointerCapture(e.pointerId)
     ptrRef.current = { active: true, startY: e.clientY, startTime: Date.now() }
   }
 
   const onMove = (e) => {
-    if (!ptrRef.current.active) return
+    if (disabled || !ptrRef.current.active) return
     const h = tileRef.current?.clientHeight || 100
     const dy = ptrRef.current.startY - e.clientY
 
@@ -78,7 +90,7 @@ function Tile() {
   }
 
   const onUp = (e) => {
-    if (!ptrRef.current.active) return
+    if (disabled || !ptrRef.current.active) return
     ptrRef.current.active = false
     const dy = ptrRef.current.startY - e.clientY
     if (Math.abs(dy) <= 10) {
@@ -106,6 +118,7 @@ function Tile() {
     const el = tileRef.current
     if (!el) return
     const onWheel = (e) => {
+      if (disabled) return
       e.preventDefault()
       const dir = e.deltaY > 0 ? 1 : -1
       const count = Math.min(10, Math.max(1, Math.round(Math.abs(e.deltaY) / 40)))
@@ -113,7 +126,7 @@ function Tile() {
     }
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => el.removeEventListener('wheel', onWheel)
-  }, [flick])
+  }, [flick, disabled])
 
   const curChar = CHARS[index]
   const prevChar = CHARS[prev]
@@ -121,7 +134,7 @@ function Tile() {
 
   return (
     <div
-      className={`tile${inverted ? ' inverted' : ''}`}
+      className={`tile${inverted ? ' inverted' : ''}${disabled ? ' disabled' : ''}`}
       ref={tileRef}
       onPointerDown={onDown}
       onPointerMove={onMove}
@@ -151,16 +164,87 @@ function Tile() {
       <div className="pin pin-r" />
     </div>
   )
+})
+
+/* ---- Speech recognition hook ---- */
+function useSpeechRecognition({ lang = 'en-US' } = {}) {
+  const [listening, setListening] = useState(false)
+  const [supported, setSupported] = useState(false)
+  const [transcript, setTranscript] = useState('')
+  const recRef = useRef(null)
+
+  useEffect(() => {
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition
+    if (!SR) { setSupported(false); return }
+    setSupported(true)
+
+    const rec = new SR()
+    rec.continuous = true
+    rec.interimResults = true
+    rec.lang = lang
+    rec.maxAlternatives = 1
+
+    rec.onresult = (event) => {
+      let text = ''
+      for (let i = 0; i < event.results.length; i++) {
+        text += event.results[i][0].transcript
+      }
+      setTranscript(text)
+    }
+
+    rec.onerror = (event) => {
+      if (event.error === 'not-allowed' || event.error === 'service-not-available') {
+        setListening(false)
+      }
+    }
+
+    rec.onend = () => {
+      if (recRef.current?._shouldListen) {
+        try { rec.start() } catch (e) { /* ignore */ }
+      } else {
+        setListening(false)
+      }
+    }
+
+    recRef.current = rec
+    recRef.current._shouldListen = false
+
+    return () => {
+      try { rec.stop() } catch (e) { /* ignore */ }
+    }
+  }, [lang])
+
+  const toggle = useCallback(() => {
+    const rec = recRef.current
+    if (!rec) return
+
+    if (listening) {
+      rec._shouldListen = false
+      rec.stop()
+      setListening(false)
+    } else {
+      rec._shouldListen = true
+      setTranscript('')
+      try { rec.start(); setListening(true) } catch (e) { /* ignore */ }
+    }
+  }, [listening])
+
+  return { listening, supported, transcript, toggle }
 }
+
+/* ---- App ---- */
+const STAGGER_MS = 30
 
 export default function App() {
   const [grid, setGrid] = useState({ cols: 1, rows: 1 })
+  const [mode, setMode] = useState('free')
+  const tileRefs = useRef([])
+  const prevTextRef = useRef('')
 
   useEffect(() => {
     const calc = () => {
       const w = window.innerWidth
       const h = window.innerHeight
-      // Tile aspect ratio ~0.72 (portrait, balanced padding around chars)
       const tileW = Math.max(50, Math.min(120, w / 7))
       const tileH = tileW / 0.72
       setGrid({
@@ -173,17 +257,78 @@ export default function App() {
     return () => window.removeEventListener('resize', calc)
   }, [])
 
+  const totalTiles = grid.cols * grid.rows
+
+  const { listening, supported, transcript, toggle } = useSpeechRecognition({
+    lang: 'en-US',
+  })
+
+  const handleMicClick = useCallback(() => {
+    setMode((m) => (m === 'free' ? 'speech' : 'free'))
+    toggle()
+  }, [toggle])
+
+  // Clear tiles when entering speech mode
+  useEffect(() => {
+    if (mode === 'speech') {
+      prevTextRef.current = ''
+      tileRefs.current.forEach((ref, i) => {
+        if (!ref) return
+        setTimeout(() => ref.flipTo(' '), i * 20)
+      })
+    }
+  }, [mode])
+
+  // Update tiles when transcript changes
+  useEffect(() => {
+    if (mode !== 'speech') return
+
+    const text = transcript.toUpperCase()
+    const prev = prevTextRef.current
+    prevTextRef.current = text
+
+    tileRefs.current.forEach((ref, i) => {
+      if (!ref) return
+      const char = i < text.length ? text[i] : ' '
+      const prevChar = i < prev.length ? prev[i] : ' '
+      if (char === prevChar) return
+
+      setTimeout(() => ref.flipTo(char), i * STAGGER_MS)
+    })
+  }, [transcript, mode, totalTiles])
+
+  tileRefs.current = tileRefs.current.slice(0, totalTiles)
+
   return (
-    <div
-      className="board"
-      style={{
-        gridTemplateColumns: `repeat(${grid.cols}, 1fr)`,
-        gridTemplateRows: `repeat(${grid.rows}, 1fr)`,
-      }}
-    >
-      {Array.from({ length: grid.cols * grid.rows }, (_, i) => (
-        <Tile key={i} />
-      ))}
-    </div>
+    <>
+      <div
+        className="board"
+        style={{
+          gridTemplateColumns: `repeat(${grid.cols}, 1fr)`,
+          gridTemplateRows: `repeat(${grid.rows}, 1fr)`,
+        }}
+      >
+        {Array.from({ length: totalTiles }, (_, i) => (
+          <Tile
+            key={i}
+            ref={(el) => { tileRefs.current[i] = el }}
+            disabled={mode === 'speech'}
+          />
+        ))}
+      </div>
+
+      {supported && (
+        <button
+          className={`mic-btn${listening ? ' mic-active' : ''}`}
+          onClick={handleMicClick}
+          aria-label={listening ? 'Stop speech recognition' : 'Start speech recognition'}
+        >
+          <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor">
+            <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
+            <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
+          </svg>
+        </button>
+      )}
+    </>
   )
 }
