@@ -139,9 +139,9 @@ export default function App() {
     const calc = () => {
       const w = window.innerWidth
       const h = window.innerHeight
-      // Tile aspect ratio ~0.55 (tall portrait, like real Solari boards)
+      // Tile aspect ratio ~0.72 (portrait, balanced padding around chars)
       const tileW = Math.max(50, Math.min(120, w / 7))
-      const tileH = tileW / 0.55
+      const tileH = tileW / 0.72
       setGrid({
         cols: Math.max(2, Math.floor(w / tileW)),
         rows: Math.max(2, Math.floor(h / tileH)),
