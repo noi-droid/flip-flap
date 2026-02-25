@@ -72,6 +72,7 @@
   color: #f0f0f0;
   line-height: 1;
   font-feature-settings: 'tnum';
+  transform: translateY(4%);
 }
 
 /* ---- Inverted (tap toggle → white) ---- */
