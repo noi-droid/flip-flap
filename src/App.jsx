@@ -5,8 +5,14 @@ const CHARS = " !'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".split('')
 const ANIM_MS = 300
 const CHAIN_MS = 100
 
+const APOSTROPHE_IDX = CHARS.indexOf("'")
+
 const Tile = forwardRef(function Tile({ disabled = false }, ref) {
-  const [index, setIndex] = useState(() => Math.floor(Math.random() * CHARS.length))
+  const [index, setIndex] = useState(() => {
+    let idx = Math.floor(Math.random() * CHARS.length)
+    if (idx === APOSTROPHE_IDX) idx = (idx + 1) % CHARS.length
+    return idx
+  })
   const [prev, setPrev] = useState(index)
   const [flipping, setFlipping] = useState(false)
   const [flipId, setFlipId] = useState(0)
@@ -19,6 +25,8 @@ const Tile = forwardRef(function Tile({ disabled = false }, ref) {
   const ptrRef = useRef({ active: false, startY: 0, startTime: 0 })
   const queueRef = useRef(0)
   const dirRef = useRef(0)
+  const disabledRef = useRef(disabled)
+  disabledRef.current = disabled
 
   const wrap = (i) => ((i % CHARS.length) + CHARS.length) % CHARS.length
 
@@ -27,7 +35,9 @@ const Tile = forwardRef(function Tile({ disabled = false }, ref) {
     lockRef.current = true
 
     const cur = idxRef.current
-    const next = wrap(cur + dir)
+    let next = wrap(cur + dir)
+    // In free mode, skip apostrophe
+    if (!disabledRef.current && next === APOSTROPHE_IDX) next = wrap(next + dir)
     const willChain = queueRef.current > 0
 
     setPrev(cur)
@@ -232,6 +242,28 @@ function useSpeechRecognition({ lang = 'en-US' } = {}) {
   return { listening, supported, transcript, toggle }
 }
 
+/* ---- Layout: one word per row ---- */
+function layoutWords(text, cols, total) {
+  const words = text.split(/\s+/).filter((w) => w.length > 0)
+  const grid = new Array(total).fill(' ')
+  let row = 0
+
+  for (const word of words) {
+    if (row * cols >= total) break
+    let col = 0
+    for (let i = 0; i < word.length; i++) {
+      const pos = row * cols + col
+      if (pos >= total) break
+      grid[pos] = word[i]
+      col++
+      if (col >= cols) { row++; col = 0 }
+    }
+    row++
+  }
+
+  return grid
+}
+
 /* ---- App ---- */
 const STAGGER_MS = 30
 
@@ -239,7 +271,7 @@ export default function App() {
   const [grid, setGrid] = useState({ cols: 1, rows: 1 })
   const [mode, setMode] = useState('free')
   const tileRefs = useRef([])
-  const prevTextRef = useRef('')
+  const prevGridRef = useRef([])
 
   useEffect(() => {
     const calc = () => {
@@ -271,31 +303,29 @@ export default function App() {
   // Clear tiles when entering speech mode
   useEffect(() => {
     if (mode === 'speech') {
-      prevTextRef.current = ''
+      prevGridRef.current = new Array(totalTiles).fill(' ')
       tileRefs.current.forEach((ref, i) => {
         if (!ref) return
         setTimeout(() => ref.flipTo(' '), i * 20)
       })
     }
-  }, [mode])
+  }, [mode, totalTiles])
 
-  // Update tiles when transcript changes
+  // Update tiles when transcript changes (one word per row)
   useEffect(() => {
     if (mode !== 'speech') return
 
     const text = transcript.toUpperCase()
-    const prev = prevTextRef.current
-    prevTextRef.current = text
+    const laid = layoutWords(text, grid.cols, totalTiles)
+    const prev = prevGridRef.current
+    prevGridRef.current = laid
 
     tileRefs.current.forEach((ref, i) => {
       if (!ref) return
-      const char = i < text.length ? text[i] : ' '
-      const prevChar = i < prev.length ? prev[i] : ' '
-      if (char === prevChar) return
-
-      setTimeout(() => ref.flipTo(char), i * STAGGER_MS)
+      if (laid[i] === (prev[i] || ' ')) return
+      setTimeout(() => ref.flipTo(laid[i]), i * STAGGER_MS)
     })
-  }, [transcript, mode, totalTiles])
+  }, [transcript, mode, totalTiles, grid.cols])
 
   tileRefs.current = tileRefs.current.slice(0, totalTiles)
 
