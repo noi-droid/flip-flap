@@ -6,21 +6,35 @@ const ANIM_MS = 300
 const CHAIN_MS = 100
 
 const WORDS = [
-  'HELLO', 'WORLD', 'FLIP', 'FLAP', 'TIME', 'LOVE', 'PLAY', 'CODE',
-  'JAZZ', 'VIBE', 'GLOW', 'RUSH', 'WAVE', 'SPIN', 'ZOOM', 'BOLD',
+  'FLIP', 'FLAP', 'TIME', 'LOVE', 'PLAY', 'CODE', 'JAZZ', 'VIBE',
+  'GLOW', 'RUSH', 'WAVE', 'SPIN', 'ZOOM', 'BOLD', 'HELLO', 'WORLD',
   'DREAM', 'NIGHT', 'SOUND', 'LIGHT', 'SPACE', 'PIXEL', 'NOISE',
   'GHOST', 'BLOOM', 'SWIFT', 'DRIFT', 'STORM', 'PULSE', 'CRISP',
   'SPARK', 'BLAZE', 'SHINE', 'CHAOS', 'VIVID', 'ORBIT', 'QUEST',
+  'RHYTHM', 'SUNSET', 'SIGNAL', 'VELVET', 'STEREO', 'CHROME',
+  'NEON', 'STATIC', 'PRISM', 'MOSAIC', 'CYPHER', 'FABRIC',
+  'CATALYST', 'SPECTRUM', 'MIDNIGHT', 'CONTRAST', 'RESONANCE',
+  'SILHOUETTE', 'MONOCHROME', 'TURBULENCE', 'HEMISPHERE',
+  'PERPETUAL', 'ALGORITHM', 'LABYRINTH', 'CHROMATIC', 'FREQUENCY',
+  'BLUEPRINT', 'GEOMETRIC', 'KINEMATIC', 'BROADCAST', 'FRAMEWORK',
 ]
 
 function pickRandomWords(cols, rows) {
-  const pool = [...WORDS].sort(() => Math.random() - 0.5)
+  // Filter to words that fit, then prefer words that fill more of the row
+  const fits = WORDS.filter((w) => w.length <= cols)
+  const shuffled = fits.sort(() => Math.random() - 0.5)
+  // Sort by length descending so longer words come first, with some randomness
+  shuffled.sort((a, b) => {
+    const aScore = a.length + Math.random() * cols * 0.4
+    const bScore = b.length + Math.random() * cols * 0.4
+    return bScore - aScore
+  })
+
   const picked = []
   let row = 0
 
-  for (const word of pool) {
+  for (const word of shuffled) {
     if (row >= rows) break
-    if (word.length > cols) continue
     picked.push(word)
     row++
   }
