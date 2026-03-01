@@ -62,18 +62,15 @@ function layoutLines(lines, cols, rows) {
   return grid
 }
 
-const Tile = forwardRef(function Tile(_, ref) {
-  const [index, setIndex] = useState(() => Math.floor(Math.random() * CHARS.length))
-  const [prev, setPrev] = useState(index)
+function useHalf(initialIdx) {
+  const [index, setIndex] = useState(initialIdx)
+  const [prev, setPrev] = useState(initialIdx)
   const [flipping, setFlipping] = useState(false)
   const [flipId, setFlipId] = useState(0)
   const [fast, setFast] = useState(false)
-  const [inverted, setInverted] = useState(false)
 
-  const idxRef = useRef(index)
+  const idxRef = useRef(initialIdx)
   const lockRef = useRef(false)
-  const tileRef = useRef(null)
-  const ptrRef = useRef({ active: false, startY: 0, startTime: 0 })
   const queueRef = useRef(0)
   const dirRef = useRef(0)
 
@@ -115,21 +112,37 @@ const Tile = forwardRef(function Tile(_, ref) {
     }
   }, [doFlip])
 
+  const flipTo = useCallback((char) => {
+    const targetChar = char.toUpperCase()
+    const targetIdx = CHARS.indexOf(targetChar)
+    const target = targetIdx === -1 ? 0 : targetIdx
+    const current = idxRef.current
+    if (current === target) return
+    const distance = (target - current + CHARS.length) % CHARS.length
+    flick(1, distance)
+  }, [flick])
+
+  return { index, prev, flipping, flipId, fast, flick, flipTo, doFlip, lockRef }
+}
+
+const Tile = forwardRef(function Tile(_, ref) {
+  const upper = useHalf(Math.floor(Math.random() * CHARS.length))
+  const lower = useHalf(Math.floor(Math.random() * CHARS.length))
+  const [inverted, setInverted] = useState(false)
+
+  const tileRef = useRef(null)
+  const ptrRef = useRef({ active: false, startY: 0, startTime: 0 })
+
   useImperativeHandle(ref, () => ({
     flipTo(char) {
-      const targetChar = char.toUpperCase()
-      const targetIdx = CHARS.indexOf(targetChar)
-      const target = targetIdx === -1 ? 0 : targetIdx
-      const current = idxRef.current
-      if (current === target) return
-      const distance = (target - current + CHARS.length) % CHARS.length
-      flick(1, distance)
+      upper.flipTo(char)
+      lower.flipTo(char)
     }
-  }), [flick])
+  }), [upper.flipTo, lower.flipTo])
 
   // --- Pointer events ---
   const onDown = (e) => {
-    if (lockRef.current) return
+    if (upper.lockRef.current) return
     tileRef.current?.setPointerCapture(e.pointerId)
     ptrRef.current = { active: true, startY: e.clientY, startTime: Date.now() }
   }
@@ -139,10 +152,12 @@ const Tile = forwardRef(function Tile(_, ref) {
     const h = tileRef.current?.clientHeight || 100
     const dy = ptrRef.current.startY - e.clientY
 
-    if (!lockRef.current && Math.abs(dy) > h * 0.25) {
+    if (!upper.lockRef.current && Math.abs(dy) > h * 0.25) {
       ptrRef.current.startY = e.clientY
       ptrRef.current.startTime = Date.now()
-      doFlip(dy > 0 ? 1 : -1)
+      const dir = dy > 0 ? 1 : -1
+      upper.doFlip(dir)
+      lower.doFlip(dir)
     }
   }
 
@@ -156,10 +171,12 @@ const Tile = forwardRef(function Tile(_, ref) {
     }
 
     const elapsed = Math.max(1, Date.now() - ptrRef.current.startTime)
-    const velocity = Math.abs(dy) / elapsed // px/ms
+    const velocity = Math.abs(dy) / elapsed
     const count = Math.min(15, Math.max(1, Math.round(velocity * 6)))
+    const dir = dy > 0 ? 1 : -1
 
-    flick(dy > 0 ? 1 : -1, count)
+    upper.flick(dir, count)
+    lower.flick(dir, count)
   }
 
   // --- Wheel ---
@@ -170,16 +187,18 @@ const Tile = forwardRef(function Tile(_, ref) {
       e.preventDefault()
       const dir = e.deltaY > 0 ? 1 : -1
       const count = Math.min(10, Math.max(1, Math.round(Math.abs(e.deltaY) / 40)))
-      flick(dir, count)
+      upper.flick(dir, count)
+      lower.flick(dir, count)
     }
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => el.removeEventListener('wheel', onWheel)
-  }, [flick])
+  }, [upper.flick, lower.flick])
 
-  const curChar = CHARS[index]
-  const prevChar = CHARS[prev]
-  const lowerChar = flipping ? prevChar : curChar
-  const empty = !flipping && curChar === ' '
+  const upperChar = CHARS[upper.index]
+  const lowerChar = CHARS[lower.index]
+  const prevUpperChar = CHARS[upper.prev]
+  const prevLowerChar = CHARS[lower.prev]
+  const empty = !upper.flipping && !lower.flipping && upperChar === ' ' && lowerChar === ' '
 
   return (
     <div
@@ -191,21 +210,21 @@ const Tile = forwardRef(function Tile(_, ref) {
       onPointerCancel={onUp}
     >
       <div className="half upper">
-        <div className="half-text"><span>{curChar}</span></div>
+        <div className="half-text"><span>{upperChar}</span></div>
       </div>
       <div className="half lower">
-        <div className="half-text"><span>{lowerChar}</span></div>
+        <div className="half-text"><span>{lower.flipping ? prevLowerChar : lowerChar}</span></div>
       </div>
 
-      {flipping && (
-        <>
-          <div className={`flap flap-top${fast ? ' fast' : ''}`} key={`t${flipId}`}>
-            <div className="half-text"><span>{prevChar}</span></div>
-          </div>
-          <div className={`flap flap-bottom${fast ? ' fast' : ''}`} key={`b${flipId}`}>
-            <div className="half-text"><span>{curChar}</span></div>
-          </div>
-        </>
+      {upper.flipping && (
+        <div className={`flap flap-top${upper.fast ? ' fast' : ''}`} key={`t${upper.flipId}`}>
+          <div className="half-text"><span>{prevUpperChar}</span></div>
+        </div>
+      )}
+      {lower.flipping && (
+        <div className={`flap flap-bottom${lower.fast ? ' fast' : ''}`} key={`b${lower.flipId}`}>
+          <div className="half-text"><span>{lowerChar}</span></div>
+        </div>
       )}
 
       <div className="split-line" />
@@ -252,10 +271,10 @@ export default function App() {
     for (let r = 0; r < grid.rows; r++) {
       for (let c = 0; c < grid.cols; c++) {
         rects.push({
-          x: PAD + c * (cellW + GAP) - 0.5,
-          y: PAD + r * (cellH + GAP) - 0.5,
-          w: cellW + 1,
-          h: cellH + 1,
+          x: PAD + c * (cellW + GAP),
+          y: PAD + r * (cellH + GAP),
+          w: cellW,
+          h: cellH,
         })
       }
     }
