@@ -1,11 +1,9 @@
-import { useState, useRef, useCallback, useEffect, useMemo, forwardRef, useImperativeHandle } from 'react'
+import { useState, useRef, useCallback, useEffect, forwardRef, useImperativeHandle } from 'react'
 import './App.css'
 
 const CHARS = ' !ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'.split('')
 const ANIM_MS = 300
 const CHAIN_MS = 100
-const GAP = 5
-const PAD = 5
 
 const DESTINATIONS = [
   'TOKYO', 'PARIS', 'LONDON', 'CAIRO', 'DUBAI', 'SEOUL', 'ROME',
@@ -198,11 +196,9 @@ const Tile = forwardRef(function Tile(_, ref) {
   const lowerChar = CHARS[lower.index]
   const prevUpperChar = CHARS[upper.prev]
   const prevLowerChar = CHARS[lower.prev]
-  const empty = !upper.flipping && !lower.flipping && upperChar === ' ' && lowerChar === ' '
-
   return (
     <div
-      className={`tile${inverted ? ' inverted' : ''}${empty ? ' empty' : ''}`}
+      className={`tile${inverted ? ' inverted' : ''}`}
       ref={tileRef}
       onPointerDown={onDown}
       onPointerMove={onMove}
@@ -260,27 +256,6 @@ export default function App() {
 
   const totalTiles = grid.cols * grid.rows
 
-  const tileRects = useMemo(() => {
-    const w = window.innerWidth
-    const h = window.innerHeight
-    const contentW = w - 2 * PAD
-    const contentH = h - 2 * PAD
-    const cellW = (contentW - (grid.cols - 1) * GAP) / grid.cols
-    const cellH = (contentH - (grid.rows - 1) * GAP) / grid.rows
-    const rects = []
-    for (let r = 0; r < grid.rows; r++) {
-      for (let c = 0; c < grid.cols; c++) {
-        rects.push({
-          x: PAD + c * (cellW + GAP),
-          y: PAD + r * (cellH + GAP),
-          w: cellW,
-          h: cellH,
-        })
-      }
-    }
-    return rects
-  }, [grid.cols, grid.rows])
-
   // Flip to initial words on mount
   useEffect(() => {
     if (totalTiles <= 1) return
@@ -304,39 +279,19 @@ export default function App() {
   tileRefs.current = tileRefs.current.slice(0, totalTiles)
 
   return (
-    <>
-      <svg width="0" height="0" style={{ position: 'absolute' }}>
-        <defs>
-          <clipPath id="tile-mask" clipPathUnits="userSpaceOnUse">
-            {tileRects.map((r, i) => (
-              <rect key={i} x={r.x} y={r.y} width={r.w} height={r.h} rx={5} />
-            ))}
-          </clipPath>
-        </defs>
-      </svg>
-      <video
-        className="bg-video"
-        src="/images/video1.mp4"
-        autoPlay
-        muted
-        loop
-        playsInline
-        style={{ clipPath: 'url(#tile-mask)' }}
-      />
-      <div
-        className="board"
-        style={{
-          gridTemplateColumns: `repeat(${grid.cols}, 1fr)`,
-          gridTemplateRows: `repeat(${grid.rows}, 1fr)`,
-        }}
-      >
-        {Array.from({ length: totalTiles }, (_, i) => (
-          <Tile
-            key={i}
-            ref={(el) => { tileRefs.current[i] = el }}
-          />
-        ))}
-      </div>
-    </>
+    <div
+      className="board"
+      style={{
+        gridTemplateColumns: `repeat(${grid.cols}, 1fr)`,
+        gridTemplateRows: `repeat(${grid.rows}, 1fr)`,
+      }}
+    >
+      {Array.from({ length: totalTiles }, (_, i) => (
+        <Tile
+          key={i}
+          ref={(el) => { tileRefs.current[i] = el }}
+        />
+      ))}
+    </div>
   )
 }
