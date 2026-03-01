@@ -5,25 +5,22 @@ const CHARS = ' !ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'.split('')
 const ANIM_MS = 300
 const CHAIN_MS = 100
 
-const WORDS = [
-  'FLIP', 'FLAP', 'TIME', 'LOVE', 'PLAY', 'CODE', 'JAZZ', 'VIBE',
-  'GLOW', 'RUSH', 'WAVE', 'SPIN', 'ZOOM', 'BOLD', 'HELLO', 'WORLD',
-  'DREAM', 'NIGHT', 'SOUND', 'LIGHT', 'SPACE', 'PIXEL', 'NOISE',
-  'GHOST', 'BLOOM', 'SWIFT', 'DRIFT', 'STORM', 'PULSE', 'CRISP',
-  'SPARK', 'BLAZE', 'SHINE', 'CHAOS', 'VIVID', 'ORBIT', 'QUEST',
-  'RHYTHM', 'SUNSET', 'SIGNAL', 'VELVET', 'STEREO', 'CHROME',
-  'NEON', 'STATIC', 'PRISM', 'MOSAIC', 'CYPHER', 'FABRIC',
-  'CATALYST', 'SPECTRUM', 'MIDNIGHT', 'CONTRAST', 'RESONANCE',
-  'SILHOUETTE', 'MONOCHROME', 'TURBULENCE', 'HEMISPHERE',
-  'PERPETUAL', 'ALGORITHM', 'LABYRINTH', 'CHROMATIC', 'FREQUENCY',
-  'BLUEPRINT', 'GEOMETRIC', 'KINEMATIC', 'BROADCAST', 'FRAMEWORK',
+const DESTINATIONS = [
+  'TOKYO', 'PARIS', 'LONDON', 'CAIRO', 'DUBAI', 'SEOUL', 'ROME',
+  'LIMA', 'OSLO', 'BALI', 'DOHA', 'LYON', 'NICE', 'PUNE',
+  'BERLIN', 'LISBON', 'SYDNEY', 'MUNICH', 'VIENNA', 'HAVANA',
+  'MOSCOW', 'NAIROBI', 'DUBLIN', 'ZURICH', 'PRAGUE', 'ATHENS',
+  'MANILA', 'BOGOTA', 'TAIPEI', 'HANOI', 'LAGOS', 'ACCRA',
+  'ISTANBUL', 'HELSINKI', 'HONOLULU', 'BANGKOK', 'BEIJING',
+  'SHANGHAI', 'FLORENCE', 'MONTREAL', 'EDINBURGH', 'BARCELONA',
+  'REYKJAVIK', 'MARRAKECH', 'STOCKHOLM', 'SINGAPORE', 'AMSTERDAM',
+  'BUENOS AIRES', 'KUALA LUMPUR', 'SAN FRANCISCO', 'NEW YORK',
+  'LOS ANGELES', 'RIO DE JANEIRO', 'JOHANNESBURG', 'COPENHAGEN',
 ]
 
-function pickRandomWords(cols, rows) {
-  // Filter to words that fit, then prefer words that fill more of the row
-  const fits = WORDS.filter((w) => w.length <= cols)
+function pickRandomDestinations(cols, rows) {
+  const fits = DESTINATIONS.filter((d) => d.length <= cols)
   const shuffled = fits.sort(() => Math.random() - 0.5)
-  // Sort by length descending so longer words come first, with some randomness
   shuffled.sort((a, b) => {
     const aScore = a.length + Math.random() * cols * 0.4
     const bScore = b.length + Math.random() * cols * 0.4
@@ -33,29 +30,26 @@ function pickRandomWords(cols, rows) {
   const picked = []
   let row = 0
 
-  for (const word of shuffled) {
+  for (const dest of shuffled) {
     if (row >= rows) break
-    picked.push(word)
+    picked.push(dest)
     row++
   }
 
-  return picked.join(' ')
+  return picked
 }
 
-function layoutWords(text, cols, total) {
-  const words = text.split(/\s+/).filter((w) => w.length > 0)
+function layoutLines(lines, cols, total) {
   const grid = new Array(total).fill(' ')
   let row = 0
 
-  for (const word of words) {
+  for (const line of lines) {
     if (row * cols >= total) break
-    let col = 0
-    for (let i = 0; i < word.length; i++) {
-      const pos = row * cols + col
+    for (let i = 0; i < line.length; i++) {
+      const pos = row * cols + i
       if (pos >= total) break
-      grid[pos] = word[i]
-      col++
-      if (col >= cols) { row++; col = 0 }
+      if (i >= cols) break
+      grid[pos] = line[i]
     }
     row++
   }
@@ -247,8 +241,8 @@ export default function App() {
     if (initRef.current === totalTiles) return
     initRef.current = totalTiles
 
-    const text = pickRandomWords(grid.cols, grid.rows)
-    const laid = layoutWords(text, grid.cols, totalTiles)
+    const lines = pickRandomDestinations(grid.cols, grid.rows)
+    const laid = layoutLines(lines, grid.cols, totalTiles)
 
     // Small delay so refs are ready, then cascade flip to words
     const timer = setTimeout(() => {
