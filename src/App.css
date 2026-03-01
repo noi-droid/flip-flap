@@ -1,10 +1,23 @@
+/* ---- Background video ---- */
+.bg-video {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100dvh;
+  object-fit: cover;
+  z-index: 0;
+}
+
 .board {
+  position: relative;
+  z-index: 1;
   display: grid;
   width: 100vw;
   height: 100dvh;
   gap: 5px;
   padding: 5px;
-  background: #111;
+  background: transparent;
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
@@ -73,6 +86,24 @@
   line-height: 1;
   font-feature-settings: 'tnum';
   transform: translateY(4%);
+}
+
+/* ---- Empty tile (transparent, video shows through) ---- */
+.tile.empty {
+  background: transparent;
+}
+
+.tile.empty .upper,
+.tile.empty .lower {
+  background: transparent;
+}
+
+.tile.empty .split-line {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.tile.empty .pin {
+  background: rgba(0, 0, 0, 0.3);
 }
 
 /* ---- Inverted (tap toggle → white) ---- */
