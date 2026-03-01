@@ -1,18 +1,56 @@
 import { useState, useRef, useCallback, useEffect, forwardRef, useImperativeHandle } from 'react'
 import './App.css'
 
-const CHARS = " !'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".split('')
+const CHARS = ' !ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'.split('')
 const ANIM_MS = 300
 const CHAIN_MS = 100
 
-const APOSTROPHE_IDX = CHARS.indexOf("'")
+const WORDS = [
+  'HELLO', 'WORLD', 'FLIP', 'FLAP', 'TIME', 'LOVE', 'PLAY', 'CODE',
+  'JAZZ', 'VIBE', 'GLOW', 'RUSH', 'WAVE', 'SPIN', 'ZOOM', 'BOLD',
+  'DREAM', 'NIGHT', 'SOUND', 'LIGHT', 'SPACE', 'PIXEL', 'NOISE',
+  'GHOST', 'BLOOM', 'SWIFT', 'DRIFT', 'STORM', 'PULSE', 'CRISP',
+  'SPARK', 'BLAZE', 'SHINE', 'CHAOS', 'VIVID', 'ORBIT', 'QUEST',
+]
 
-const Tile = forwardRef(function Tile({ disabled = false }, ref) {
-  const [index, setIndex] = useState(() => {
-    let idx = Math.floor(Math.random() * CHARS.length)
-    if (idx === APOSTROPHE_IDX) idx = (idx + 1) % CHARS.length
-    return idx
-  })
+function pickRandomWords(cols, rows) {
+  const pool = [...WORDS].sort(() => Math.random() - 0.5)
+  const picked = []
+  let row = 0
+
+  for (const word of pool) {
+    if (row >= rows) break
+    if (word.length > cols) continue
+    picked.push(word)
+    row++
+  }
+
+  return picked.join(' ')
+}
+
+function layoutWords(text, cols, total) {
+  const words = text.split(/\s+/).filter((w) => w.length > 0)
+  const grid = new Array(total).fill(' ')
+  let row = 0
+
+  for (const word of words) {
+    if (row * cols >= total) break
+    let col = 0
+    for (let i = 0; i < word.length; i++) {
+      const pos = row * cols + col
+      if (pos >= total) break
+      grid[pos] = word[i]
+      col++
+      if (col >= cols) { row++; col = 0 }
+    }
+    row++
+  }
+
+  return grid
+}
+
+const Tile = forwardRef(function Tile(_, ref) {
+  const [index, setIndex] = useState(() => Math.floor(Math.random() * CHARS.length))
   const [prev, setPrev] = useState(index)
   const [flipping, setFlipping] = useState(false)
   const [flipId, setFlipId] = useState(0)
@@ -25,8 +63,6 @@ const Tile = forwardRef(function Tile({ disabled = false }, ref) {
   const ptrRef = useRef({ active: false, startY: 0, startTime: 0 })
   const queueRef = useRef(0)
   const dirRef = useRef(0)
-  const disabledRef = useRef(disabled)
-  disabledRef.current = disabled
 
   const wrap = (i) => ((i % CHARS.length) + CHARS.length) % CHARS.length
 
@@ -35,9 +71,7 @@ const Tile = forwardRef(function Tile({ disabled = false }, ref) {
     lockRef.current = true
 
     const cur = idxRef.current
-    let next = wrap(cur + dir)
-    // In free mode, skip apostrophe
-    if (!disabledRef.current && next === APOSTROPHE_IDX) next = wrap(next + dir)
+    const next = wrap(cur + dir)
     const willChain = queueRef.current > 0
 
     setPrev(cur)
@@ -82,13 +116,13 @@ const Tile = forwardRef(function Tile({ disabled = false }, ref) {
 
   // --- Pointer events ---
   const onDown = (e) => {
-    if (disabled || lockRef.current) return
+    if (lockRef.current) return
     tileRef.current?.setPointerCapture(e.pointerId)
     ptrRef.current = { active: true, startY: e.clientY, startTime: Date.now() }
   }
 
   const onMove = (e) => {
-    if (disabled || !ptrRef.current.active) return
+    if (!ptrRef.current.active) return
     const h = tileRef.current?.clientHeight || 100
     const dy = ptrRef.current.startY - e.clientY
 
@@ -100,7 +134,7 @@ const Tile = forwardRef(function Tile({ disabled = false }, ref) {
   }
 
   const onUp = (e) => {
-    if (disabled || !ptrRef.current.active) return
+    if (!ptrRef.current.active) return
     ptrRef.current.active = false
     const dy = ptrRef.current.startY - e.clientY
     if (Math.abs(dy) <= 10) {
@@ -115,20 +149,11 @@ const Tile = forwardRef(function Tile({ disabled = false }, ref) {
     flick(dy > 0 ? 1 : -1, count)
   }
 
-  // --- Initial random flips on mount ---
-  useEffect(() => {
-    const delay = Math.random() * 1200
-    const count = 3 + Math.floor(Math.random() * 8)
-    const timer = setTimeout(() => flick(1, count), delay)
-    return () => clearTimeout(timer)
-  }, [flick])
-
   // --- Wheel ---
   useEffect(() => {
     const el = tileRef.current
     if (!el) return
     const onWheel = (e) => {
-      if (disabled) return
       e.preventDefault()
       const dir = e.deltaY > 0 ? 1 : -1
       const count = Math.min(10, Math.max(1, Math.round(Math.abs(e.deltaY) / 40)))
@@ -136,7 +161,7 @@ const Tile = forwardRef(function Tile({ disabled = false }, ref) {
     }
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => el.removeEventListener('wheel', onWheel)
-  }, [flick, disabled])
+  }, [flick])
 
   const curChar = CHARS[index]
   const prevChar = CHARS[prev]
@@ -144,7 +169,7 @@ const Tile = forwardRef(function Tile({ disabled = false }, ref) {
 
   return (
     <div
-      className={`tile${inverted ? ' inverted' : ''}${disabled ? ' disabled' : ''}`}
+      className={`tile${inverted ? ' inverted' : ''}`}
       ref={tileRef}
       onPointerDown={onDown}
       onPointerMove={onMove}
@@ -176,108 +201,19 @@ const Tile = forwardRef(function Tile({ disabled = false }, ref) {
   )
 })
 
-/* ---- Speech recognition hook ---- */
-function useSpeechRecognition({ lang = 'en-US' } = {}) {
-  const [listening, setListening] = useState(false)
-  const [supported, setSupported] = useState(false)
-  const [transcript, setTranscript] = useState('')
-  const recRef = useRef(null)
-
-  useEffect(() => {
-    const SR = window.SpeechRecognition || window.webkitSpeechRecognition
-    if (!SR) { setSupported(false); return }
-    setSupported(true)
-
-    const rec = new SR()
-    rec.continuous = true
-    rec.interimResults = true
-    rec.lang = lang
-    rec.maxAlternatives = 1
-
-    rec.onresult = (event) => {
-      let text = ''
-      for (let i = 0; i < event.results.length; i++) {
-        text += event.results[i][0].transcript
-      }
-      setTranscript(text)
-    }
-
-    rec.onerror = (event) => {
-      if (event.error === 'not-allowed' || event.error === 'service-not-available') {
-        setListening(false)
-      }
-    }
-
-    rec.onend = () => {
-      if (recRef.current?._shouldListen) {
-        try { rec.start() } catch (e) { /* ignore */ }
-      } else {
-        setListening(false)
-      }
-    }
-
-    recRef.current = rec
-    recRef.current._shouldListen = false
-
-    return () => {
-      try { rec.stop() } catch (e) { /* ignore */ }
-    }
-  }, [lang])
-
-  const toggle = useCallback(() => {
-    const rec = recRef.current
-    if (!rec) return
-
-    if (listening) {
-      rec._shouldListen = false
-      rec.stop()
-      setListening(false)
-    } else {
-      rec._shouldListen = true
-      setTranscript('')
-      try { rec.start(); setListening(true) } catch (e) { /* ignore */ }
-    }
-  }, [listening])
-
-  return { listening, supported, transcript, toggle }
-}
-
-/* ---- Layout: one word per row ---- */
-function layoutWords(text, cols, total) {
-  const words = text.split(/\s+/).filter((w) => w.length > 0)
-  const grid = new Array(total).fill(' ')
-  let row = 0
-
-  for (const word of words) {
-    if (row * cols >= total) break
-    let col = 0
-    for (let i = 0; i < word.length; i++) {
-      const pos = row * cols + col
-      if (pos >= total) break
-      grid[pos] = word[i]
-      col++
-      if (col >= cols) { row++; col = 0 }
-    }
-    row++
-  }
-
-  return grid
-}
-
 /* ---- App ---- */
-const STAGGER_MS = 30
+const STAGGER_MS = 15
 
 export default function App() {
   const [grid, setGrid] = useState({ cols: 1, rows: 1 })
-  const [mode, setMode] = useState('free')
   const tileRefs = useRef([])
-  const prevGridRef = useRef([])
+  const initRef = useRef(null)
 
   useEffect(() => {
     const calc = () => {
       const w = window.innerWidth
       const h = window.innerHeight
-      const tileW = Math.max(50, Math.min(120, w / 7))
+      const tileW = Math.max(36, Math.min(80, w / 10))
       const tileH = tileW / 0.72
       setGrid({
         cols: Math.max(2, Math.floor(w / tileW)),
@@ -291,74 +227,42 @@ export default function App() {
 
   const totalTiles = grid.cols * grid.rows
 
-  const { listening, supported, transcript, toggle } = useSpeechRecognition({
-    lang: 'en-US',
-  })
-
-  const handleMicClick = useCallback(() => {
-    setMode((m) => (m === 'free' ? 'speech' : 'free'))
-    toggle()
-  }, [toggle])
-
-  // Clear tiles when entering speech mode
+  // Flip to initial words on mount
   useEffect(() => {
-    if (mode === 'speech') {
-      prevGridRef.current = new Array(totalTiles).fill(' ')
+    if (totalTiles <= 1) return
+    if (initRef.current === totalTiles) return
+    initRef.current = totalTiles
+
+    const text = pickRandomWords(grid.cols, grid.rows)
+    const laid = layoutWords(text, grid.cols, totalTiles)
+
+    // Small delay so refs are ready, then cascade flip to words
+    const timer = setTimeout(() => {
       tileRefs.current.forEach((ref, i) => {
         if (!ref) return
-        setTimeout(() => ref.flipTo(' '), i * 20)
+        setTimeout(() => ref.flipTo(laid[i]), i * STAGGER_MS)
       })
-    }
-  }, [mode, totalTiles])
+    }, 50)
 
-  // Update tiles when transcript changes (one word per row)
-  useEffect(() => {
-    if (mode !== 'speech') return
-
-    const text = transcript.toUpperCase()
-    const laid = layoutWords(text, grid.cols, totalTiles)
-    const prev = prevGridRef.current
-    prevGridRef.current = laid
-
-    tileRefs.current.forEach((ref, i) => {
-      if (!ref) return
-      if (laid[i] === (prev[i] || ' ')) return
-      setTimeout(() => ref.flipTo(laid[i]), i * STAGGER_MS)
-    })
-  }, [transcript, mode, totalTiles, grid.cols])
+    return () => clearTimeout(timer)
+  }, [totalTiles, grid.cols, grid.rows])
 
   tileRefs.current = tileRefs.current.slice(0, totalTiles)
 
   return (
-    <>
-      <div
-        className="board"
-        style={{
-          gridTemplateColumns: `repeat(${grid.cols}, 1fr)`,
-          gridTemplateRows: `repeat(${grid.rows}, 1fr)`,
-        }}
-      >
-        {Array.from({ length: totalTiles }, (_, i) => (
-          <Tile
-            key={i}
-            ref={(el) => { tileRefs.current[i] = el }}
-            disabled={mode === 'speech'}
-          />
-        ))}
-      </div>
-
-      {supported && (
-        <button
-          className={`mic-btn${listening ? ' mic-active' : ''}`}
-          onClick={handleMicClick}
-          aria-label={listening ? 'Stop speech recognition' : 'Start speech recognition'}
-        >
-          <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor">
-            <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z" />
-            <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z" />
-          </svg>
-        </button>
-      )}
-    </>
+    <div
+      className="board"
+      style={{
+        gridTemplateColumns: `repeat(${grid.cols}, 1fr)`,
+        gridTemplateRows: `repeat(${grid.rows}, 1fr)`,
+      }}
+    >
+      {Array.from({ length: totalTiles }, (_, i) => (
+        <Tile
+          key={i}
+          ref={(el) => { tileRefs.current[i] = el }}
+        />
+      ))}
+    </div>
   )
 }
