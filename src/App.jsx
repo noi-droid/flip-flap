@@ -1,63 +1,42 @@
-import { useState, useRef, useCallback, useEffect, forwardRef, useImperativeHandle } from 'react'
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react'
 import './App.css'
 
 const CHARS = ' !ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'.split('')
 const ANIM_MS = 300
 const CHAIN_MS = 100
 
-const DESTINATIONS = [
-  'TOKYO', 'PARIS', 'LONDON', 'CAIRO', 'DUBAI', 'SEOUL', 'ROME',
-  'LIMA', 'OSLO', 'BALI', 'DOHA', 'LYON', 'NICE', 'PUNE',
-  'BERLIN', 'LISBON', 'SYDNEY', 'MUNICH', 'VIENNA', 'HAVANA',
-  'MOSCOW', 'NAIROBI', 'DUBLIN', 'ZURICH', 'PRAGUE', 'ATHENS',
-  'MANILA', 'BOGOTA', 'TAIPEI', 'HANOI', 'LAGOS', 'ACCRA',
-  'ISTANBUL', 'HELSINKI', 'HONOLULU', 'BANGKOK', 'BEIJING',
-  'SHANGHAI', 'FLORENCE', 'MONTREAL', 'EDINBURGH', 'BARCELONA',
-  'REYKJAVIK', 'MARRAKECH', 'STOCKHOLM', 'SINGAPORE', 'AMSTERDAM',
-  'BUENOS AIRES', 'KUALA LUMPUR', 'SAN FRANCISCO', 'NEW YORK',
-  'LOS ANGELES', 'RIO DE JANEIRO', 'JOHANNESBURG', 'COPENHAGEN',
+const WORDS = [
+  'HELLO', 'WORLD', 'FLIP', 'FLAP', 'SPLIT',
+  'BOARD', 'CODE', 'REACT', 'JAZZ', 'PIXEL',
+  'QUICK', 'ZEBRA', 'GLYPH', 'NIGHT', 'STORM',
+  'DREAM', 'LIGHT', 'SPACE', 'DRIFT', 'GHOST',
 ]
 
-function pickRandomDestinations(cols, rows) {
-  const fits = DESTINATIONS.filter((d) => d.length <= cols)
-  const shuffled = fits.sort(() => Math.random() - 0.5)
-  shuffled.sort((a, b) => {
-    const aScore = a.length + Math.random() * cols * 0.4
-    const bScore = b.length + Math.random() * cols * 0.4
-    return bScore - aScore
-  })
+function generateBoard(cols, rows) {
+  const board = Array.from({ length: rows * cols }, () => ' ')
+  const pool = [...WORDS].sort(() => Math.random() - 0.5)
+  let wi = 0
 
-  const maxRows = Math.max(1, Math.ceil(rows * 0.35))
-  const picked = []
+  for (let r = 0; r < rows && wi < pool.length; r++) {
+    if (Math.random() < 0.35) continue
 
-  for (const dest of shuffled) {
-    if (picked.length >= maxRows) break
-    picked.push(dest)
-  }
+    let col = Math.floor(Math.random() * Math.max(1, cols - 6))
 
-  return picked
-}
+    while (col < cols && wi < pool.length) {
+      const word = pool[wi]
+      if (col + word.length > cols) break
 
-function layoutLines(lines, cols, rows) {
-  const total = cols * rows
-  const grid = new Array(total).fill(' ')
+      for (let i = 0; i < word.length; i++) {
+        board[r * cols + col + i] = word[i]
+      }
+      wi++
+      col += word.length + Math.floor(Math.random() * 4) + 2
 
-  const allRows = Array.from({ length: rows }, (_, i) => i)
-  for (let i = allRows.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
-    ;[allRows[i], allRows[j]] = [allRows[j], allRows[i]]
-  }
-  const selectedRows = allRows.slice(0, lines.length).sort((a, b) => a - b)
-
-  lines.forEach((line, idx) => {
-    const row = selectedRows[idx]
-    for (let i = 0; i < line.length && i < cols; i++) {
-      const pos = row * cols + i
-      if (pos < total) grid[pos] = line[i]
+      if (Math.random() < 0.5) break
     }
-  })
+  }
 
-  return grid
+  return board
 }
 
 function useHalf(initialIdx) {
@@ -110,37 +89,47 @@ function useHalf(initialIdx) {
     }
   }, [doFlip])
 
-  const flipTo = useCallback((char) => {
-    const targetChar = char.toUpperCase()
-    const targetIdx = CHARS.indexOf(targetChar)
-    const target = targetIdx === -1 ? 0 : targetIdx
-    const current = idxRef.current
-    if (current === target) return
-    const distance = (target - current + CHARS.length) % CHARS.length
-    flick(1, distance)
+  const flipTo = useCallback((targetIdx) => {
+    const cur = idxRef.current
+    const target = ((targetIdx % CHARS.length) + CHARS.length) % CHARS.length
+    if (cur === target) return
+    const fwd = (target - cur + CHARS.length) % CHARS.length
+    const bwd = (cur - target + CHARS.length) % CHARS.length
+    if (fwd <= bwd) {
+      flick(1, fwd)
+    } else {
+      flick(-1, bwd)
+    }
   }, [flick])
 
-  return { index, prev, flipping, flipId, fast, flick, flipTo, doFlip, lockRef }
+  return { index, prev, flipping, flipId, fast, flick, flipTo, doFlip, lockRef, idxRef }
 }
 
-const Tile = forwardRef(function Tile(_, ref) {
-  const upper = useHalf(Math.floor(Math.random() * CHARS.length))
-  const lower = useHalf(Math.floor(Math.random() * CHARS.length))
-  const [inverted, setInverted] = useState(false)
+function Tile({ target = ' ' }) {
+  const targetIdx = Math.max(0, CHARS.indexOf(target))
+  const [startIdx] = useState(() => Math.floor(Math.random() * CHARS.length))
+
+  const upper = useHalf(startIdx)
+  const lower = useHalf(startIdx)
+  const [mismatched, setMismatched] = useState(false)
 
   const tileRef = useRef(null)
   const ptrRef = useRef({ active: false, startY: 0, startTime: 0 })
+  const initRef = useRef(false)
 
-  useImperativeHandle(ref, () => ({
-    flipTo(char) {
-      upper.flipTo(char)
-      lower.flipTo(char)
-    }
-  }), [upper.flipTo, lower.flipTo])
+  // --- Initial shuffle → land on target ---
+  useEffect(() => {
+    if (initRef.current) return
+    initRef.current = true
+    const dist = (targetIdx - startIdx + CHARS.length) % CHARS.length
+    const count = dist < 10 ? dist + CHARS.length : dist
+    upper.flick(1, count)
+    lower.flick(1, count)
+  }, [])
 
   // --- Pointer events ---
   const onDown = (e) => {
-    if (upper.lockRef.current) return
+    if (upper.lockRef.current && lower.lockRef.current) return
     tileRef.current?.setPointerCapture(e.pointerId)
     ptrRef.current = { active: true, startY: e.clientY, startTime: Date.now() }
   }
@@ -164,7 +153,23 @@ const Tile = forwardRef(function Tile(_, ref) {
     ptrRef.current.active = false
     const dy = ptrRef.current.startY - e.clientY
     if (Math.abs(dy) <= 10) {
-      setInverted((v) => !v)
+      if (upper.lockRef.current || lower.lockRef.current) return
+      if (!mismatched) {
+        // Both flip → end on different chars
+        const upperOff = Math.floor(Math.random() * 10) + 3
+        const extraOff = Math.floor(Math.random() * (CHARS.length - 2)) + 1
+        upper.flick(1, upperOff)
+        lower.flick(1, upperOff + extraOff)
+        setMismatched(true)
+      } else {
+        // Both flip → converge to same char
+        const n = Math.floor(Math.random() * 5) + 3
+        const dest = (upper.idxRef.current + n) % CHARS.length
+        upper.flick(1, n)
+        const lowerDist = (dest - lower.idxRef.current + CHARS.length) % CHARS.length
+        lower.flick(1, lowerDist < 3 ? lowerDist + CHARS.length : lowerDist)
+        setMismatched(false)
+      }
       return
     }
 
@@ -198,7 +203,7 @@ const Tile = forwardRef(function Tile(_, ref) {
   const prevLowerChar = CHARS[lower.prev]
   return (
     <div
-      className={`tile${inverted ? ' inverted' : ''}`}
+      className="tile"
       ref={tileRef}
       onPointerDown={onDown}
       onPointerMove={onMove}
@@ -228,15 +233,11 @@ const Tile = forwardRef(function Tile(_, ref) {
       <div className="pin pin-r" />
     </div>
   )
-})
+}
 
 /* ---- App ---- */
-const STAGGER_MS = 15
-
 export default function App() {
   const [grid, setGrid] = useState({ cols: 1, rows: 1 })
-  const tileRefs = useRef([])
-  const initRef = useRef(null)
 
   useEffect(() => {
     const calc = () => {
@@ -254,29 +255,10 @@ export default function App() {
     return () => window.removeEventListener('resize', calc)
   }, [])
 
-  const totalTiles = grid.cols * grid.rows
-
-  // Flip to initial words on mount
-  useEffect(() => {
-    if (totalTiles <= 1) return
-    if (initRef.current === totalTiles) return
-    initRef.current = totalTiles
-
-    const lines = pickRandomDestinations(grid.cols, grid.rows)
-    const laid = layoutLines(lines, grid.cols, grid.rows)
-
-    // Small delay so refs are ready, then cascade flip to words
-    const timer = setTimeout(() => {
-      tileRefs.current.forEach((ref, i) => {
-        if (!ref) return
-        setTimeout(() => ref.flipTo(laid[i]), i * STAGGER_MS)
-      })
-    }, 50)
-
-    return () => clearTimeout(timer)
-  }, [totalTiles, grid.cols, grid.rows])
-
-  tileRefs.current = tileRefs.current.slice(0, totalTiles)
+  const board = useMemo(
+    () => generateBoard(grid.cols, grid.rows),
+    [grid.cols, grid.rows]
+  )
 
   return (
     <div
@@ -286,11 +268,8 @@ export default function App() {
         gridTemplateRows: `repeat(${grid.rows}, 1fr)`,
       }}
     >
-      {Array.from({ length: totalTiles }, (_, i) => (
-        <Tile
-          key={i}
-          ref={(el) => { tileRefs.current[i] = el }}
-        />
+      {board.map((char, i) => (
+        <Tile key={`${grid.cols}-${grid.rows}-${i}`} target={char} />
       ))}
     </div>
   )
